@@ -13,17 +13,7 @@ export async function createCircleUser(email) {
       userId: internalUserId,
     });
 
-    return {
-      internalUserId,
-      export async function createCircleUser(email) {
-  try {
-    const internalUserId = `user-${uuidv4()}`;
-    
-    const response = await client.createUser({
-      userId: internalUserId,
-    });
-
-    console.log('Circle API Response:', JSON.stringify(response, null, 2));
+    console.log('Circle Response:', response.data);
 
     return {
       internalUserId,
