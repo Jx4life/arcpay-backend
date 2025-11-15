@@ -15,8 +15,20 @@ export async function createCircleUser(email) {
 
     return {
       internalUserId,
-      circleUserId: response.data.user.id,
-      token: response.data.user.token,
+      export async function createCircleUser(email) {
+  try {
+    const internalUserId = `user-${uuidv4()}`;
+    
+    const response = await client.createUser({
+      userId: internalUserId,
+    });
+
+    console.log('Circle API Response:', JSON.stringify(response, null, 2));
+
+    return {
+      internalUserId,
+      circleUserId: response.data?.user?.id || response.data?.id,
+      token: response.data?.user?.token || response.data?.token,
     };
   } catch (error) {
     console.error('Error creating Circle user:', error);
