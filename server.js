@@ -151,7 +151,6 @@ function logPayment(payrollAddress, status, message, txHash = null) {
   paymentLogs.push(log);
   console.log(`[${log.timestamp}] ${status}: ${message}`);
   
-  // Keep only last 1000 logs
   if (paymentLogs.length > 1000) {
     paymentLogs.shift();
   }
@@ -163,10 +162,7 @@ async function getAllPayrolls() {
     
     try {
       const allPayrollsInfo = await factoryReadOnly.getAllPayrolls();
-      
-      // Extract just the payroll contract addresses from the PayrollInfo structs
       const payrollAddresses = allPayrollsInfo.map(info => info.payrollContract);
-      
       console.log(`Found ${payrollAddresses.length} payroll contracts`);
       return payrollAddresses;
     } catch (error) {
@@ -182,15 +178,12 @@ async function getAllPayrolls() {
 async function checkAndProcessPayroll(payrollAddress) {
   try {
     const payrollContract = new ethers.Contract(payrollAddress, PAYROLL_ABI, wallet);
-    
-    // Check for due payments
     const duePayments = await payrollContract.getDuePayments();
     
     if (duePayments.length === 0) {
       return { processed: 0, dueCount: 0 };
     }
 
-    // Check contract balance
     const balance = await payrollContract.getContractBalance();
     
     if (balance === 0n) {
@@ -198,10 +191,7 @@ async function checkAndProcessPayroll(payrollAddress) {
       return { processed: 0, dueCount: duePayments.length, reason: 'insufficient_balance' };
     }
 
-    // Get payroll owner
     const owner = await payrollContract.owner();
-
-    // Create unique payment ID to prevent duplicates
     const paymentId = `${payrollAddress}-${Date.now()}`;
     
     if (processedPayments.has(paymentId)) {
@@ -210,13 +200,11 @@ async function checkAndProcessPayroll(payrollAddress) {
 
     logPayment(payrollAddress, 'PROCESSING', `${duePayments.length} due payments found`);
 
-    // Process due payments
     const tx = await payrollContract.processDuePayments({
-      gasLimit: 500000 * duePayments.length // Dynamic gas limit
+      gasLimit: 500000 * duePayments.length
     });
     
     const receipt = await tx.wait();
-    
     processedPayments.add(paymentId);
     
     logPayment(
@@ -226,7 +214,6 @@ async function checkAndProcessPayroll(payrollAddress) {
       receipt.hash
     );
 
-    // Clean up old processed payments (keep last 1000)
     if (processedPayments.size > 1000) {
       const toDelete = Array.from(processedPayments).slice(0, processedPayments.size - 1000);
       toDelete.forEach(id => processedPayments.delete(id));
@@ -275,29 +262,24 @@ async function processAllPayrolls() {
     totalProcessed += result.processed;
     totalDue += result.dueCount;
     
-    // Small delay between processing to avoid rate limits
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   console.log(`✅ Completed: ${totalProcessed}/${totalDue} payments processed\n`);
-
   return { totalProcessed, totalDue, payrolls: results };
 }
 
 // ============= CRON JOBS =============
-// Run every hour
 cron.schedule('0 * * * *', async () => {
   console.log('⏰ Hourly payment check triggered');
   await processAllPayrolls();
 });
 
-// Run every day at 9 AM
 cron.schedule('0 9 * * *', async () => {
   console.log('⏰ Daily payment check triggered (9 AM)');
   await processAllPayrolls();
 });
 
-// Run every Monday at 8 AM
 cron.schedule('0 8 * * 1', async () => {
   console.log('⏰ Weekly payment check triggered (Monday 8 AM)');
   await processAllPayrolls();
@@ -305,7 +287,6 @@ cron.schedule('0 8 * * 1', async () => {
 
 // ============= API ROUTES =============
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -315,7 +296,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Get bot wallet info
 app.get('/api/bot/info', async (req, res) => {
   try {
     if (!wallet) {
@@ -334,7 +314,6 @@ app.get('/api/bot/info', async (req, res) => {
   }
 });
 
-// Get all payrolls
 app.get('/api/payrolls', async (req, res) => {
   try {
     const payrolls = await getAllPayrolls();
@@ -373,7 +352,6 @@ app.get('/api/payrolls', async (req, res) => {
   }
 });
 
-// Get specific payroll details
 app.get('/api/payroll/:address', async (req, res) => {
   try {
     const { address } = req.params;
@@ -412,7 +390,6 @@ app.get('/api/payroll/:address', async (req, res) => {
   }
 });
 
-// Manual trigger for payment processing
 app.post('/api/process/all', async (req, res) => {
   try {
     if (!wallet) {
@@ -426,7 +403,6 @@ app.post('/api/process/all', async (req, res) => {
   }
 });
 
-// Process specific payroll
 app.post('/api/process/:address', async (req, res) => {
   try {
     if (!wallet) {
@@ -441,14 +417,12 @@ app.post('/api/process/:address', async (req, res) => {
   }
 });
 
-// Get payment logs
 app.get('/api/logs', (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   const logs = paymentLogs.slice(-limit).reverse();
   res.json({ logs, count: logs.length });
 });
 
-// Get statistics
 app.get('/api/stats', (req, res) => {
   const successCount = paymentLogs.filter(log => log.status === 'SUCCESS').length;
   const errorCount = paymentLogs.filter(log => log.status === 'ERROR').length;
@@ -486,6 +460,26 @@ app.post('/api/circle/create-user', async (req, res) => {
   }
 });
 
+app.post('/api/circle/initialize-user', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+
+    const initData = await initializeUser(userId);
+    
+    res.json({
+      success: true,
+      challengeId: initData.challengeId,
+    });
+  } catch (error) {
+    console.error('Initialize user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/circle/create-wallet', async (req, res) => {
   try {
     const { userId, blockchain } = req.body;
@@ -518,28 +512,7 @@ app.get('/api/circle/wallets/:userId', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-// Initialize user (set PIN) - ADD THIS ROUTE
-app.post('/api/circle/initialize-user', async (req, res) => {
-  try {
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
-    }
 
-    // Import this function from circle-service.js
-    const { initializeUser } = await import('./circle-service.js');
-    const initData = await initializeUser(userId);
-    
-    res.json({
-      success: true,
-      challengeId: initData.challengeId,
-    });
-  } catch (error) {
-    console.error('Initialize user error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 // ============= START SERVER =============
 app.listen(PORT, () => {
   console.log(`\n🚀 ArcPay Backend Server running on port ${PORT}`);
@@ -554,6 +527,10 @@ app.listen(PORT, () => {
   console.log(`  POST /api/process/:address`);
   console.log(`  GET  /api/logs`);
   console.log(`  GET  /api/stats`);
+  console.log(`  POST /api/circle/create-user`);
+  console.log(`  POST /api/circle/initialize-user`);
+  console.log(`  POST /api/circle/create-wallet`);
+  console.log(`  GET  /api/circle/wallets/:userId`);
   console.log(`\n⏰ Automated payments scheduled:`);
   console.log(`  - Every hour (0 * * * *)`);
   console.log(`  - Daily at 9 AM (0 9 * * *)`);
