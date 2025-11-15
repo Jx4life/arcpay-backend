@@ -5,6 +5,7 @@ import { ethers } from 'ethers';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import { createCircleUser, createUserWallet, getUserWallets } from './circle-service.js';
 
 dotenv.config();
 
@@ -15,7 +16,6 @@ app.use(cors({
     'http://localhost:3002',
     'https://arcpay-dashboard-jzy1u1m23-jxs-projects-a427b0e8.vercel.app',
     'https://arcpay-admin-dashboard.vercel.app',
-    /https:\/\/arcpay-.*\.vercel\.app$/
   ],
   credentials: true
 }));
@@ -463,6 +463,61 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
+// ============= CIRCLE WALLET ROUTES =============
+
+app.post('/api/circle/create-user', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+
+    const userData = await createCircleUser(email);
+    
+    res.json({
+      success: true,
+      userId: userData.circleUserId,
+      userToken: userData.token,
+      internalUserId: userData.internalUserId,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/circle/create-wallet', async (req, res) => {
+  try {
+    const { userId, blockchain } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+
+    const walletData = await createUserWallet(userId, blockchain);
+    
+    res.json({
+      success: true,
+      challengeId: walletData.challengeId,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/circle/wallets/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const wallets = await getUserWallets(userId);
+    
+    res.json({
+      success: true,
+      wallets,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // ============= START SERVER =============
 app.listen(PORT, () => {
   console.log(`\n🚀 ArcPay Backend Server running on port ${PORT}`);
