@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-import { createCircleUser, createUserWallet, getUserWallets } from './circle-service.js';
+import { createCircleUser, createUserWallet, getUserWallets, initializeUser } from './circle-service.js';
 
 dotenv.config();
 
@@ -515,6 +515,28 @@ app.get('/api/circle/wallets/:userId', async (req, res) => {
       wallets,
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// Initialize user (set PIN) - ADD THIS ROUTE
+app.post('/api/circle/initialize-user', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+
+    // Import this function from circle-service.js
+    const { initializeUser } = await import('./circle-service.js');
+    const initData = await initializeUser(userId);
+    
+    res.json({
+      success: true,
+      challengeId: initData.challengeId,
+    });
+  } catch (error) {
+    console.error('Initialize user error:', error);
     res.status(500).json({ error: error.message });
   }
 });
