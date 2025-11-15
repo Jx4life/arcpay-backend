@@ -9,14 +9,23 @@ import nodemailer from 'nodemailer';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    'http://localhost:3001',
+    'https://arcpay-admin-dashboard.vercel.app',
+    'https://arcpay-admin-dashboard-*.vercel.app'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // ============= CONFIGURATION =============
 const PORT = process.env.PORT || 3001;
 const RPC_URL = process.env.RPC_URL || 'https://rpc.testnet.arc.network';
-const PRIVATE_KEY = process.env.PRIVATE_KEY; // Bot wallet private key
-const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || '0xF5B0A2B082889D56c497dB0822776BEbb1295c7c';
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || '0x352B36616Fd3c13f663d372762A4671179703cB4';
 
 // ============= ABIs =============
 const FACTORY_ABI = [
