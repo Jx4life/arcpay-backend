@@ -13,9 +13,9 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:3002',
-    'http://localhost:3001',
+    'https://arcpay-dashboard-jzy1u1m23-jxs-projects-a427b0e8.vercel.app',
     'https://arcpay-admin-dashboard.vercel.app',
-    'https://arcpay-admin-dashboard-*.vercel.app'
+    /https:\/\/arcpay-.*\.vercel\.app$/
   ],
   credentials: true
 }));
