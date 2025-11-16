@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-import { createCircleUser, createUserWallet, getUserWallets, initializeUser } from './circle-service.js';
+import { createCircleUser, createUserWallet, getUserWallets, initializeUser, getUserByEmail } from './circle-service.js';
 
 dotenv.config();
 
@@ -511,8 +511,7 @@ app.post('/api/circle/create-user-simple', async (req, res) => {
     // Create user
     const userData = await createCircleUser(email);
     
-    // Automatically initialize and create wallet
-    // Circle will send verification email if SMTP is configured
+    // Initialize and create wallet
     const initData = await initializeUser(userData.internalUserId);
     
     res.json({
@@ -520,7 +519,9 @@ app.post('/api/circle/create-user-simple', async (req, res) => {
       userId: userData.internalUserId,
       email: email,
       challengeId: initData.challengeId,
-      message: 'User and wallet creation initiated. Check your email for verification.',
+      userToken: userData.token,
+      encryptionKey: userData.encryptionKey,
+      message: 'User created. Please set PIN to create wallet.',
     });
   } catch (error) {
     console.error('Simple user creation error:', error);
@@ -557,6 +558,39 @@ app.get('/api/circle/wallets/:userId', async (req, res) => {
       wallets,
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// ============= CIRCLE LOGIN ROUTE =============
+app.post('/api/circle/login', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+
+    // Get user from storage
+    const user = getUserByEmail(email);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found. Please sign up first.' });
+    }
+
+    // Create a restore PIN challenge
+    const restoreResponse = await client.createUserToken({
+      userId: user.internalUserId,
+    });
+
+    res.json({
+      success: true,
+      userId: user.internalUserId,
+      userToken: restoreResponse.data?.userToken,
+      encryptionKey: restoreResponse.data?.encryptionKey,
+      challengeId: null, // User will enter their existing PIN
+    });
+  } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: error.message });
   }
 });

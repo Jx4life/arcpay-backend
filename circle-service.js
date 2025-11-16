@@ -9,12 +9,11 @@ const client = initiateUserControlledWalletsClient({
   apiKey: process.env.CIRCLE_API_KEY,
 });
 
-// In-memory storage (replace with database in production)
+// In-memory storage
 const users = new Map();
 
 export async function createCircleUser(email) {
   try {
-    // Check if user already exists by email
     const existingUser = users.get(email);
     if (existingUser) {
       console.log('User already exists, returning existing data');
@@ -25,13 +24,14 @@ export async function createCircleUser(email) {
     
     console.log('Creating Circle user with ID:', internalUserId);
     
+    // Create user entity
     const response = await client.createUser({
       userId: internalUserId,
     });
 
     console.log('✅ Circle user created:', response.data);
 
-    // Get user token
+    // Get user token and encryption key
     const tokenResponse = await client.createUserToken({
       userId: internalUserId,
     });
@@ -40,14 +40,13 @@ export async function createCircleUser(email) {
 
     const userData = {
       internalUserId,
-      circleUserId: internalUserId, // For user-controlled wallets, these are the same
+      circleUserId: internalUserId,
       token: tokenResponse.data?.userToken,
       encryptionKey: tokenResponse.data?.encryptionKey,
       email,
       createdAt: new Date().toISOString(),
     };
 
-    // Store user data
     users.set(email, userData);
     users.set(internalUserId, userData);
 
@@ -68,19 +67,17 @@ export async function initializeUser(userId) {
       throw new Error('User not found in storage');
     }
 
-    console.log('Initializing user with email auth:', userId);
+    console.log('Initializing user and creating wallet:', userId);
 
-    // Initialize user and create wallet in one step
-    // Circle will use your SMTP settings to send verification email automatically
+    // Create user PIN and wallet in one call
     const response = await client.createUserPinWithWallets({
       userId: userId,
-      blockchains: ['ARB-SEPOLIA'], // Arbitrum Sepolia testnet
-      accountType: 'EOA',
+      blockchains: ['ARB-SEPOLIA'],
+      accountType: 'SCA', // Use SCA instead of EOA
       metadata: [{
         name: 'ArcPay Wallet',
         refId: `arcpay-${uuidv4().slice(0, 8)}`,
       }],
-      // Circle will automatically send email verification using your Gmail SMTP
     });
 
     console.log('✅ User initialized, challengeId:', response.data?.challengeId);
@@ -108,7 +105,7 @@ export async function createUserWallet(userId, blockchain = 'ARB-SEPOLIA') {
     const response = await client.createWallets({
       userId: userId,
       blockchains: [blockchain],
-      accountType: 'EOA',
+      accountType: 'SCA',
       metadata: [{
         name: `ArcPay Wallet - ${blockchain}`,
         refId: `arcpay-${blockchain.toLowerCase()}-${uuidv4().slice(0, 8)}`,
@@ -150,7 +147,6 @@ export async function getUserWallets(userId) {
   }
 }
 
-// Helper functions to retrieve users
 export function getUserByEmail(email) {
   return users.get(email);
 }
