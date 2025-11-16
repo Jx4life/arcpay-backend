@@ -16,7 +16,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'http://localhost:3000',
+      'http://localhost:5173',
       'http://localhost:3002',
       'http://localhost:3001',
       'https://arcpayreal-production.up.railway.app',
@@ -35,6 +35,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ============= CONFIGURATION =============
 const PORT = process.env.PORT || 3001;
@@ -495,6 +497,37 @@ app.post('/api/circle/initialize-user', async (req, res) => {
   }
 });
 
+// ============= SIMPLE CIRCLE WALLET CREATION (Backend-only, no SDK needed) =============
+app.post('/api/circle/create-user-simple', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+
+    console.log('Creating simple Circle user for:', email);
+
+    // Create user
+    const userData = await createCircleUser(email);
+    
+    // Automatically initialize and create wallet
+    // Circle will send verification email if SMTP is configured
+    const initData = await initializeUser(userData.internalUserId);
+    
+    res.json({
+      success: true,
+      userId: userData.internalUserId,
+      email: email,
+      challengeId: initData.challengeId,
+      message: 'User and wallet creation initiated. Check your email for verification.',
+    });
+  } catch (error) {
+    console.error('Simple user creation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/circle/create-wallet', async (req, res) => {
   try {
     const { userId, blockchain } = req.body;
@@ -544,6 +577,7 @@ app.listen(PORT, () => {
   console.log(`  GET  /api/stats`);
   console.log(`  POST /api/circle/create-user`);
   console.log(`  POST /api/circle/initialize-user`);
+  console.log(`  POST /api/circle/create-user-simple`);
   console.log(`  POST /api/circle/create-wallet`);
   console.log(`  GET  /api/circle/wallets/:userId`);
   console.log(`\n⏰ Automated payments scheduled:`);
