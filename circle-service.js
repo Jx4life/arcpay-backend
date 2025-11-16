@@ -19,9 +19,32 @@ export async function createCircleUser(email) {
       internalUserId,
       circleUserId: response.data?.user?.id || response.data?.id,
       token: response.data?.user?.token || response.data?.token,
+      encryptionKey: response.data?.encryptionKey,
+      email,
     };
   } catch (error) {
     console.error('Error creating Circle user:', error);
+    throw error;
+  }
+}
+
+export async function initializeUser(userId) {
+  try {
+    const response = await client.createUserPinWithWallets({
+      userId,
+      blockchains: ['ARB-SEPOLIA'],
+      accountType: 'EOA',
+      metadata: [{
+        name: 'ArcPay Wallet',
+        refId: `arcpay-${uuidv4().slice(0, 8)}`,
+      }],
+    });
+
+    return {
+      challengeId: response.data.challengeId,
+    };
+  } catch (error) {
+    console.error('Error initializing user:', error);
     throw error;
   }
 }
